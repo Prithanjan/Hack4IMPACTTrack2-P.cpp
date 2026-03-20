@@ -23,10 +23,8 @@ frontend/.env.local
 frontend/.env.*.local
 *.env
 
-# ── Markdown docs (per user request) ─────────────────
-README.md
-*.md
-!prd.txt
+# ── README is tracked; other loose .md files are not ──
+!README.md
 
 # ── Editor / OS ──────────────────────────────────────
 .vscode/
