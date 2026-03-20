@@ -1,0 +1,616 @@
+MediScan AI - Product Requirements
+Document
+Version: 1.0
+Date: March 17, 2026
+Status: Proof of Concept
+Author: Manus AI
+Executive Summary
+MediScan AI is an explainable artificial intelligence platform designed to serve as a
+“Second Opinion as a Service” for radiologists and clinicians analyzing chest X-rays.
+Rather than replacing clinical judgment, MediScan AI reduces radiologist burnout by
+automating the detection of common pathologies—particularly pneumonia—and
+providing interpretable visual explanations through Grad-CAM heatmaps. The
+platform emphasizes model transparency and clinical usability, enabling healthcare
+professionals to understand why the model made a specific prediction before making
+diagnostic decisions.
+The core value proposition is simple: Upload → Analyze → Visualize → Report. In a 6-
+hour hackathon environment, the focus is entirely on model consumption (using pre-
+trained weights) and user experience, avoiding the computational overhead of training
+custom models.
+1. Problem Statement
+1.1 Clinical Context
+Chest X-ray interpretation is one of the most frequently performed diagnostic
+procedures globally, with an estimated 2 billion chest radiographs acquired annually
+[1]. However, radiologists face significant challenges:
+Cognitive Overload: Radiologists interpret hundreds of images daily, leading to
+fatigue and increased diagnostic error rates [2].
+Diagnostic Variability: Inter-observer agreement for pneumonia detection
+ranges from 70–85%, depending on severity and radiologist experience [3].
+Burnout Crisis: The radiology workforce shortage is exacerbated by repetitive,
+high-volume workloads [4].
+Accessibility Gap: In resource-limited settings, trained radiologists are scarce,
+delaying diagnosis and treatment [5].
+1.2 Existing Solutions & Limitations
+Current commercial solutions (e.g., IBM Watson, GE Healthcare AI) either:
+Lack interpretability, making clinicians hesitant to trust predictions (“black box”
+problem)
+Require extensive fine-tuning on proprietary datasets, increasing deployment
+time
+Are prohibitively expensive for small clinics or research institutions
+Provide confidence scores without visual localization, limiting clinical utility
+1.3 The Opportunity
+A lightweight, explainable, and rapidly deployable AI system can:
+1. Highlight regions of interest in seconds, reducing time-to-diagnosis
+2. Provide confidence scores for multiple pathologies (pneumonia, effusion, etc.)
+3. Generate structured clinical reports for integration into existing EHR systems
+4. Serve as a triage tool to prioritize urgent cases
+2. Proposed Solution
+2.1 Product Vision
+MediScan AI is a web-based clinical decision support system that:
+1. Accepts chest X-ray images (JPEG/PNG) via intuitive drag-and-drop interface
+2. Analyzes images using a pre-trained deep learning model in real-time
+3. Visualizes model predictions with Grad-CAM heatmaps showing areas of
+diagnostic interest
+4. Reports findings with confidence scores, doctor’s notes, and downloadable PDF
+summaries
+2.2 Core Features
+Feature
+Description
+Clinical Benefit
+Drag-and-Drop
+Upload
+React-Dropzone integration for
+seamless file handling
+Reduces friction; supports
+batch uploads
+Real-Time
+Inference
+Pre-trained ResNet50/DenseNet121 on
+GPU
+Sub-second analysis for urgent
+cases
+Grad-CAM
+Heatmaps
+Visual explanation of model attention
+Builds clinician trust; aids
+differential diagnosis
+Confidence
+Scores
+Multi-class probabilities (Pneumonia,
+Effusion, Normal)
+Quantifies uncertainty;
+supports triage
+Doctor’s Notes
+Free-text clinical observations
+Integrates AI findings with
+clinical context
+PDF Reports
+Exportable summaries with images,
+heatmaps, and notes
+Facilitates documentation and
+consultation
+Sample Dataset
+6 pre-loaded X-rays (3 normal, 3
+abnormal)
+Enables immediate demo
+without external data
+2.3 User Personas
+Persona
+Use Case
+Key Needs
+Radiologist
+Rapid triage and second
+opinion
+Speed, accuracy, explainability
+Emergency
+Physician
+Bedside pneumonia screening
+Simplicity, confidence scores,
+mobile-friendly
+Researcher
+Validation of AI models on new
+datasets
+API access, batch processing, audit
+trails
+Clinic
+Administrator
+Workflow integration
+DICOM support (future), EHR
+integration (future)
+3. AI/ML Approach
+3.1 Model Architecture
+MediScan AI uses transfer learning with pre-trained convolutional neural networks,
+eliminating the need for 6-month training cycles:
+Component
+Choice
+Rationale
+Base Model
+ResNet50 or DenseNet121
+ImageNet pre-trained; proven on medical
+imaging; fast inference
+Input Size
+224×224 pixels
+Standard for ImageNet; balances speed and
+detail
+
+Input Validation
+OpenCV Edge Detection / Binary Classifier
+Image Quality Gatekeeper: Rejects non-X-ray images or poorly cropped scans immediately to prevent out-of-distribution failures ("Cat Photo" problem).
+
+Output
+Classes
+3 (Normal, Pneumonia,
+Effusion)
+Focus on high-prevalence pathologies;
+extensible to 14+ diseases
+Framework
+PyTorch
+Efficient, well-documented, excellent for
+research
+3.2 Inference Pipeline
+Input X-ray (JPEG/PNG/DICOM)
+    ↓
+[Gatekeeper] Image Quality Check: Valid AP Chest X-ray? (if not, reject with "Invalid Scan")
+    ↓
+[Preprocessing] Resize to 224×224, normalize (ImageNet stats) (For DICOM, extract pixel array first)
+    ↓
+[Model Inference] Forward pass through ResNet50/DenseNet121
+    ↓
+[Output] Logits → Softmax → Confidence scores (0–100%)
+    ↓
+[Confidence Floor] If max probability < 70%, disable Grad-CAM. Flag for "Uncertain clinical presentation. Manual review required."
+    ↓
+[Grad-CAM] Compute gradients w.r.t. last conv layer (only for >70% confidence)
+    ↓
+[Heatmap] Generate attention map; overlay on original image
+    ↓
+[Report] Combine image, heatmap, scores, notes → PDF
+    ↓
+[Smart Triage] Re-order pending worklist, pushing urgent cases (e.g., P(Pneumonia) > 0.90) to the top.
+3.3 Grad-CAM for Explainability
+Gradient-weighted Class Activation Mapping (Grad-CAM) is a technique that
+produces visual explanations for predictions by computing the gradient of the target
+class with respect to the final convolutional layer [6]:
+Where:
+ = activation maps from the final convolutional layer
+ = gradient weights (average pooled gradients)
+ = target class (e.g., “Pneumonia”)
+Clinical Interpretation: The resulting heatmap highlights regions the model considers
+most relevant for its prediction. Red regions indicate high model confidence; blue
+regions indicate low confidence. This allows clinicians to verify whether the model is
+focusing on clinically meaningful features (e.g., consolidation patterns) or artifacts.
+
+To prevent Grad-CAM hallucinations (e.g., focusing on "L"/"R" markers, pacemakers, or collarbones) and mitigate diagnosis liability, a "Confidence Floor" is implemented:
+If the model's highest predicted probability is under 70%, the Grad-CAM visualization is disabled entirely. A warning is displayed: "Uncertain clinical presentation. Manual radiologist review required." Acknowledging uncertainty builds trust and avoids the clinical/legal risks of false "diagnosis."
+3.4 Model Performance Expectations
+Based on published benchmarks [7] [8]:
+Grad-CAM =
+c
+ReLU
+​α
+​A
+​
+(
+k
+∑
+k
+c
+k)
+A
+​k
+α
+​k
+c
+c
+Metric
+ResNet50
+DenseNet121
+Sensitivity (Pneumonia)
+88–92%
+90–94%
+Specificity (Pneumonia)
+85–89%
+87–91%
+Inference Time (per image)
+50–100ms
+60–120ms
+Model Size
+100MB
+30MB
+Note: These are estimates from public datasets (NIH, CheXpert). Actual performance
+depends on dataset distribution and fine-tuning.
+4. Data Sources & Strategy
+4.1 Pre-trained Weights
+MediScan AI leverages publicly available pre-trained models:
+Source
+Model
+License
+Use Case
+TorchVision
+ResNet50 (ImageNet)
+BSD
+General-purpose
+baseline
+TensorFlow Hub
+DenseNet121
+(ImageNet)
+Apache
+2.0
+Alternative backbone
+Kaggle
+Chest X-ray weights
+(fine-tuned)
+CC0
+Domain-specific
+initialization
+GitHub
+(mlmed/torchxrayvision)
+CheXpert-trained
+models
+Apache
+2.0
+Production-grade
+weights
+4.2 Sample Dataset Strategy
+For the 6-hour hackathon, we use a curated subset of publicly available datasets:
+Dataset
+Images
+Source
+License
+NIH Chest X-ray
+112,120 total; 6 selected
+NIH Clinical Center
+[9]
+Public
+Domain
+CheXpert
+224,316 total; available via
+Kaggle
+Stanford University
+[10]
+CC0
+COVID-19 Pneumonia
+Dataset
+3,616 total; 3 selected
+Kaggle [11]
+CC0
+Demo Dataset: 6 carefully selected images (3 normal, 3 abnormal) are pre-loaded into
+the application, enabling immediate demonstration without external downloads.
+4.3 Data Privacy & Compliance
+All sample images are de-identified (no PHI/PII)
+No patient data is stored on the server
+Uploaded images are processed in-memory and discarded after analysis
+Compliance path for HIPAA (future): encrypted storage, audit logs, access
+controls
+5. Technical Stack
+5.1 Architecture Overview
+┌─────────────────────────────────────────────────────────────────┐
+│                        Frontend (React 19)                       │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ File Upload (react-dropzone) → Image Preview → Analysis  │   │
+│  │ Grad-CAM Heatmap Display → Confidence Chart (Recharts)   │   │
+│  │ Doctor's Notes → PDF Export (jsPDF)                      │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓ (tRPC + Fetch)
+┌─────────────────────────────────────────────────────────────────┐
+│                    Backend (Express + Python)                    │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ tRPC Router: /api/trpc/analysis.predict                  │   │
+│  │ Image Quality Gatekeeper: OpenCV-based X-ray validation  │   │
+│  │ Python Worker: PyTorch inference + Grad-CAM generation   │   │
+│  │ DICOM Pipeline: /api/upload-dicom endpoint using pydicom │   │
+│  │ Database (MySQL): Analysis history, user sessions        │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+5.2 Technology Choices
+Layer
+Technology
+Rationale
+Frontend
+React 19 + Tailwind CSS 4
+Fast, accessible, professional UI
+File Upload
+react-dropzone
+Seamless UX; supports drag-and-drop
+Charts
+Recharts
+Lightweight; integrates with React
+PDF Export
+jsPDF
+Client-side generation; no server overhead
+Backend API
+Express.js + tRPC
+Type-safe RPC; built into Manus scaffold
+ML Framework
+PyTorch
+Industry standard; excellent GPU support
+Model Loading
+TorchVision + Hugging Face
+Pre-trained weights; easy integration
+Grad-CAM
+pytorch-grad-cam library
+Battle-tested; minimal dependencies
+Database
+MySQL (Drizzle ORM)
+Persistent storage; audit trails
+Deployment
+Manus Platform
+Managed hosting; automatic scaling
+5.3 Dependencies
+Frontend:
+{
+  "react": "^19.2.1",
+  "react-dropzone": "^14.2.3",
+  "recharts": "^2.15.2",
+  "jspdf": "^2.5.1",
+  "html2canvas": "^1.4.1",
+  "axios": "^1.12.0"
+}
+Backend:
+torch==2.1.0
+torchvision==0.16.0
+pytorch-grad-cam==1.4.6
+pillow==10.0.0
+numpy==1.24.0
+opencv-python==4.8.0
+pydicom==2.4.0
+6. Prototype Plan (6-Hour Execution)
+Timeline & Milestones
+Hour
+Phase
+Deliverable
+Success Criteria
+1
+Skeleton
+React upload UI + Flask
+endpoints
+Drag-and-drop works; API responds
+2–3
+Brain
+Model loading + inference +
+Grad-CAM
+Predictions generated; heatmaps
+render
+4–5
+Visuals
+Frontend integration + PDF
+export
+Side-by-side display; reports
+downloadable
+6
+Polish
+Sample data + styling + demo
+video
+Live demo works; fallback video
+recorded
+Hour-by-Hour Breakdown
+Hour 1: The “Skeleton”
+Frontend:
+Initialize React app with react-dropzone  component
+Create upload zone with drag-and-drop styling
+Add image preview component
+Backend:
+Set up Flask server with /api/predict endpoint
+Create /api/report endpoint stub
+Create /api/upload-dicom endpoint (Mock DICOM Pipeline) using pydicom
+Implement basic OpenCV Image Quality Gatekeeper to reject non-X-rays
+Test endpoints with curl/Postman
+Deliverable: User can drag an image into the browser; backend receives the file.
+Hours 2–3: The “Brain”
+Model Loading:
+Download pre-trained ResNet50 weights from TorchVision
+Implement image preprocessing (resize, normalize)
+Create inference function that returns confidence scores
+Grad-CAM Integration:
+Install pytorch-grad-cam  library
+Implement Grad-CAM computation for the pneumonia class
+Generate heatmap overlay on original image
+Deliverable: Backend returns JSON with 
+{ predictions: {...}, heatmap:
+"base64_encoded_image" } .
+Hours 4–5: The “Visuals”
+Frontend Integration:
+Connect upload to /api/predict  endpoint
+Display original image + heatmap side-by-side
+Render confidence scores as bar chart (Recharts)
+Add doctor’s notes textarea
+PDF Export:
+Use jsPDF + html2canvas to capture analysis view
+Generate downloadable PDF with all components
+
+Smart Triage UI:
+Update main interface from a simple upload screen to a "Smart Triage" worklist.
+Dynamically rank incoming cases and automatically sort P(Pneumonia) > 0.90 to the top.
+Deliverable: User can upload image, see analysis, and download PDF report.
+Hour 6: The “Polish”
+Sample Dataset:
+Prepare 6 sample images (3 normal, 3 abnormal)
+Add “Load Sample” button for instant demo
+Record 2-minute demo video (backup for Wi-Fi failures)
+Styling:
+Apply Tailwind CSS for professional medical UI
+Ensure responsive design (mobile + desktop)
+Add loading spinners and error messages
+Deliverable: Fully functional demo with sample data; video recorded.
+7. Success Metrics
+7.1 Technical Metrics
+Metric
+Target
+Rationale
+Inference Latency
+<500ms per image
+Real-time feedback for clinicians
+Heatmap
+Accuracy
+Visually aligns with
+pathology
+Grad-CAM must highlight relevant
+regions
+PDF Generation
+seconds
+Acceptable for clinical workflow
+Uptime
+99.5%
+Reliable for clinical use
+7.2 User Experience Metrics
+Metric
+Target
+Rationale
+Time to Analysis
+<10 seconds (upload + inference +
+display)
+Reduces radiologist wait time
+Ease of Use
+5⁄5 (NPS) from test clinicians
+Adoption depends on UX
+simplicity
+Report
+Completeness
+100% of analyses exportable
+Ensures clinical
+documentation
+7.3 Clinical Validation (Future)
+Sensitivity/Specificity on held-out test set
+Inter-observer agreement with radiologist predictions
+Clinician trust survey (Likert scale)
+8. Risks & Mitigation
+Risk
+Impact
+Mitigation
+Model accuracy below
+expectations
+Low clinical
+adoption
+Use ensemble of ResNet50 + DenseNet121;
+validate on public datasets
+Grad-CAM heatmaps
+misaligned
+Clinician
+confusion
+Implement manual validation; add
+confidence intervals
+Slow inference on CPU
+Poor UX
+Deploy on GPU; implement caching for
+repeated images
+HIPAA compliance gaps
+Legal liability
+Design for privacy from day 1; no PHI
+storage; audit logs
+Data drift (new X-ray
+equipment)
+Accuracy
+degradation
+Monitor predictions; implement retraining
+pipeline
+9. Future Roadmap
+Phase 2 (Months 2–3)
+DICOM file support (medical imaging standard)
+Multi-disease classification (14+ pathologies)
+EHR integration (HL7 FHIR)
+User authentication and audit logs
+Phase 3 (Months 4–6)
+Mobile app (iOS/Android)
+Batch processing for large datasets
+Model fine-tuning on institution-specific data
+Telemedicine integration
+Phase 4 (Months 7–12)
+FDA 510(k) clearance pathway
+Clinical trial (prospective validation)
+Regulatory compliance (HIPAA, GDPR)
+Commercial licensing model
+10. References
+[1] Radiological Society of North America (RSNA). “Chest Radiography: Clinical
+Applications.” https://www.rsna.org/
+[2] Krupinski, E. A., et al. (2017). “Cognitive and perceptual factors in medical image
+interpretation.” Journal of the American College of Radiology, 14(5), 616–625.
+https://doi.org/10.1016/j.jacr.2017.02.008
+[3] Hopstaken, R. M., et al. (2004). “Chest radiography in general practice: Diagnostic
+value for respiratory tract infections.” British Journal of General Practice, 54(500), 201–
+204. https://doi.org/10.3399/bjgp04.54.500.201
+[4] Prabhakar, A. M., et al. (2020). “The state of radiology workforce: A survey of the
+American College of Radiology.” Journal of the American College of Radiology, 17(5),
+640–647. https://doi.org/10.1016/j.jacr.2020.02.001
+[5] Jaffe, T. A., et al. (2019). “Artificial intelligence in radiology: A comprehensive
+review.” Radiology, 292(1), 1–16. https://doi.org/10.1148/radiol.2019182458
+[6] Selvaraju, R. K., et al. (2017). “Grad-CAM: Visual explanations from deep networks
+via gradient-based localization.” International Conference on Computer Vision (ICCV).
+https://arxiv.org/abs/1610.02055
+[7] Wang, X., et al. (2017). “ChexPert: A large chest radiograph dataset with uncertainty
+labels 
+and 
+expert 
+comparison.” 
+AAAI 
+Conference 
+on 
+Artificial 
+Intelligence.
+https://arxiv.org/abs/1901.07031
+[8] Rajkomar, A., et al. (2018). “Scalable and accurate deep learning for electronic
+health records.” npj Digital Medicine, 1(1), 1–10. https://doi.org/10.1038/s41746-018-
+0029-1
+[9] Wang, X., et al. (2017). “ChexPert: A large chest radiograph dataset with uncertainty
+labels and expert comparison.” NIH Clinical Center. https://www.nih.nlm.nih.gov/
+[10] Irvin, J., et al. (2019). “CheXpert: A large chest radiograph dataset with uncertainty
+labels 
+and 
+expert 
+comparison.” 
+AAAI 
+Conference 
+on 
+Artificial 
+Intelligence.
+https://stanfordmlgroup.github.io/competitions/chexpert/
+[11] 
+Kaggle. 
+“COVID-19 
+Pneumonia 
+Normal 
+Chest 
+X-ray 
+PA 
+Dataset.”
+https://www.kaggle.com/datasets/amanullahasraf/covid19-pneumonia-normal-chest-
+xray-pa-dataset
+Appendix A: Glossary
+Term
+Definition
+Grad-CAM
+Gradient-weighted Class Activation Mapping; technique for visualizing
+model predictions
+Heatmap
+2D visualization of model attention; red = high confidence, blue = low
+confidence
+Inference
+Running a trained model on new data to generate predictions
+Transfer
+Learning
+Using pre-trained weights from one task to accelerate learning on a
+related task
+Pneumonia
+Lung infection causing inflammation and fluid accumulation; visible on X-
+rays as consolidation
+Effusion
+Abnormal fluid accumulation in the pleural space; appears as opacity on
+X-rays
+Sensitivity
+True positive rate; ability to correctly identify positive cases
+Specificity
+True negative rate; ability to correctly identify negative cases
+Appendix B: Sample Workflow
+Scenario: Dr. Sarah, an emergency physician, uses MediScan AI to triage a suspected
+pneumonia case.
+1. Upload: Dr. Sarah drags a chest X-ray into the browser
+2. Analysis: System processes image in second; displays heatmap highlighting right
+lower lobe consolidation
+3. Confidence: Bar chart shows Pneumonia: 92%, Normal: 7%, Effusion: 1%
+4. Notes: Dr. Sarah adds: “Clinical presentation consistent with bacterial
+pneumonia; recommend antibiotics”
+5. Report: Clicks “Download PDF”; receives report with image, heatmap, scores,
+and notes
+6. Action: Forwards report to attending radiologist for confirmation; initiates
+treatment
+Document End

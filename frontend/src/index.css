@@ -1,0 +1,218 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/container-queries";
+@plugin "@tailwindcss/forms";
+
+@theme {
+  --color-primary-fixed-dim: #b4c5ff;
+  --color-error-container: #ffdad6;
+  --color-tertiary-fixed-dim: #b7c8e1;
+  --color-surface-container-high: #e6e8ea;
+  --color-secondary-fixed-dim: #b6c4ff;
+  --color-on-tertiary-fixed: #0b1c30;
+  --color-on-error-container: #93000a;
+  --color-secondary: #4059aa;
+  --color-on-primary-container: #eeefff;
+  --color-on-surface: #191c1e;
+  --color-surface-container-highest: #e0e3e5;
+  --color-on-secondary-fixed: #00164e;
+  --color-on-secondary-container: #1d3989;
+  --color-on-primary-fixed-variant: #003ea8;
+  --color-tertiary-fixed: #d3e4fe;
+  --color-on-tertiary-fixed-variant: #38485d;
+  --color-on-error: #ffffff;
+  --color-surface: #f7f9fb;
+  --color-on-primary: #ffffff;
+  --color-outline: #737686;
+  --color-surface-dim: #d8dadc;
+  --color-primary-container: #2563eb;
+  --color-error: #ba1a1a;
+  --color-on-surface-variant: #434655;
+  --color-on-tertiary-container: #e9f0ff;
+  --color-surface-container: #eceef0;
+  --color-on-tertiary: #ffffff;
+  --color-on-background: #191c1e;
+  --color-surface-tint: #0053db;
+  --color-on-secondary-fixed-variant: #264191;
+  --color-background: #f7f9fb;
+  --color-tertiary: #46566c;
+  --color-secondary-fixed: #dce1ff;
+  --color-surface-container-low: #f2f4f6;
+  --color-primary-fixed: #dbe1ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #8fa7fe;
+  --color-inverse-on-surface: #eff1f3;
+  --color-surface-variant: #e0e3e5;
+  --color-primary: #004ac6;
+  --color-inverse-surface: #2d3133;
+  --color-inverse-primary: #b4c5ff;
+  --color-tertiary-container: #5e6e85;
+  --color-outline-variant: #c3c6d7;
+  --color-surface-bright: #f7f9fb;
+  --color-on-primary-fixed: #00174b;
+
+  --font-headline: "Manrope", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
+
+/* ── Light-mode adaptive hero variables ──────────────────────── */
+:root {
+  --hero-bg-start:     #eef2ff;
+  --hero-bg-end:       #f7f9fb;
+  --hero-orb-1:        rgba(37, 99, 235, 0.12);
+  --hero-orb-2:        rgba(249, 115, 22, 0.10);
+  --hero-orb-3:        rgba(99, 102, 241, 0.10);
+  --hero-particle:     rgba(37, 99, 235, 0.35);
+  --hero-particle-ln:  rgba(37, 99, 235, 0.10);
+  --scanner-bg:        rgba(255, 255, 255, 0.85);
+  --scanner-border:    rgba(37, 99, 235, 0.20);
+  --scanner-text:      #1e3a8a;
+  --scanner-sub:       #4b5563;
+  --scanner-cell-bg:   rgba(37, 99, 235, 0.06);
+  --scanner-cell-bdr:  rgba(37, 99, 235, 0.14);
+  --scanline-color:    rgba(0, 0, 0, 0.025);
+}
+
+.dark {
+  --hero-bg-start:     #0c1324;
+  --hero-bg-end:       #070d1f;
+  --hero-orb-1:        rgba(37, 99, 235, 0.45);
+  --hero-orb-2:        rgba(188, 72, 0, 0.35);
+  --hero-orb-3:        rgba(180, 197, 255, 0.35);
+  --hero-particle:     rgba(180, 197, 255, 0.55);
+  --hero-particle-ln:  rgba(180, 197, 255, 0.12);
+  --scanner-bg:        rgba(7, 13, 31, 0.92);
+  --scanner-border:    rgba(180, 197, 255, 0.28);
+  --scanner-text:      #dce1fb;
+  --scanner-sub:       #c3c6d7;
+  --scanner-cell-bg:   rgba(180, 197, 255, 0.06);
+  --scanner-cell-bdr:  rgba(180, 197, 255, 0.12);
+  --scanline-color:    rgba(0, 0, 0, 0.04);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+  }
+}
+
+.dark {
+  --color-surface: #080f1f;
+  --color-on-surface: #e4ebff;
+  --color-surface-container-lowest: #040918;
+  --color-surface-container-low: #0f1729;
+  --color-surface-container: #151e35;
+  --color-surface-container-high: #1e273f;
+  --color-surface-container-highest: #27324e;
+  --color-on-surface-variant: #cdd3f0;
+  --color-outline: #9da1b8;
+  --color-outline-variant: #3d4260;
+  --color-primary: #c5d4ff;
+  --color-on-primary: #001d76;
+  --color-primary-container: #1d4ed8;
+  --color-on-primary-container: #f0f3ff;
+  --color-tertiary: #ffc1a0;
+  --color-on-tertiary: #581e00;
+  --color-tertiary-container: #bc4800;
+  --color-on-tertiary-container: #ffede6;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+}
+
+.tonal-boundary {
+  background-color: var(--color-surface-container-low);
+}
+
+.glass-panel {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+}
+
+/* ── Global premium animation keyframes ─────────────────────── */
+@keyframes floatOrb {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50%       { transform: translateY(-22px) scale(1.06); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+@keyframes scanline {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 0.06; }
+  90%  { opacity: 0.06; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(180, 197, 255, 0); }
+  50%       { box-shadow: 0 0 20px 4px rgba(180, 197, 255, 0.2); }
+}
+
+@keyframes drift {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  33%  { transform: translate(6px, -8px) rotate(1deg); }
+  66%  { transform: translate(-4px, 5px) rotate(-1deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* ── Skeuomorphic helper classes ────────────────────────────── */
+.sku-card {
+  background: var(--color-surface-container-lowest);
+  border: 1px solid rgba(180, 197, 255, 0.1);
+  border-radius: 1rem;
+  box-shadow:
+    0 4px 40px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.sku-card::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(180, 197, 255, 0.28), transparent);
+}
+
+.glow-border {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-container-low) 25%,
+    var(--color-surface-container-high) 50%,
+    var(--color-surface-container-low) 75%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* ── Scrollbar customisation ────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface-container-low); }
+::-webkit-scrollbar-thumb { background: var(--color-outline-variant); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-outline); }
+
+/* ── Scanline decorative overlay ────────────────────────────── */
+.scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.035) 2px,
+    rgba(0, 0, 0, 0.035) 4px
+  );
+}
+

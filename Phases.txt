@@ -1,0 +1,23 @@
+Phase 1: The Skeleton (Frontend UI & Upload)Goal: Create a static, polished React interface where a user can drag and drop an X-ray image.Prompt for your AI:"I am building the frontend for a medical AI app called MediScan AI. Please write a single, comprehensive React component using React 19 and Tailwind CSS.Requirements:Create a clean, professional medical UI (use blues, whites, and grays).Implement a drag-and-drop file upload zone using react-dropzone. It should only accept JPEG and PNG files.
+Once an image is dropped, display a preview of the uploaded image.Add a 'Analyze X-Ray' button below the preview (make it disabled if no image is uploaded).Create a placeholder layout side-by-side below the upload zone: The left side will eventually show the 'Original X-Ray' and the right side will show the 'Grad-CAM Heatmap'.
+Provide the complete, copy-pasteable code for App.jsx.
+"Phase 2: The Bridge (Backend API Setup)Goal: Set up a simple Python Flask server to receive the image and return dummy data, ensuring the connection works before adding heavy Machine Learning.Prompt for your AI:"I need a simple Python Flask backend to serve a React application.Requirements:Create a Flask app with CORS enabled.Create a POST endpoint at /api/predict that accepts a multipart/form-data file upload (an image).For now, do NOT implement any machine learning. 
+Just receive the image, print 'Image received' to the console, and return a mock JSON response.The mock JSON response must look exactly like this:{ "status": "success", "predictions": [ {"class": "Pneumonia", "confidence": 92.5}, {"class": "Normal", "confidence": 7.0}, {"class": "Effusion", "confidence": 0.5} ], "heatmap_base64": "dummy_string" }Provide the app.py code and the requirements.txt file.
+"Phase 3: The Brain (PyTorch & Grad-CAM)Goal: Replace the backend dummy data with actual ML inference using a pre-trained ResNet50 model and generate the visual explainability heatmap.Prompt for your AI:"Update my Flask app.py to include real PyTorch inference.Requirements:
+1. Load a pre-trained ResNet50 model from torchvision. Modify the final fully connected layer to output 3 classes: Normal, Pneumonia, and Effusion.
+2. When an image hits the /api/predict endpoint, preprocess it: resize to 224x224, convert to tensor, and normalize using standard ImageNet stats.
+3. Run the forward pass to get confidence scores (using Softmax).
+4. Use the pytorch-grad-cam library to generate a Grad-CAM heatmap for the predicted class.
+5. Overlay the heatmap on the original image (red for high activation, blue for low).
+6. Encode the resulting overlaid image as a base64 string.
+7. Return the actual confidence scores and the base64 heatmap string in the JSON response.
+Provide the complete, updated app.py code."Phase 4: The Nerves (Frontend Integration & Visuals)Goal: Connect the React frontend to the real Flask API and display the results dynamically.Prompt for your AI:"Update my React App.jsx to communicate with my Flask backend at http://localhost:5000/api/predict.Requirements:When the user clicks 'Analyze X-Ray', send the uploaded image file to the API via FormData. Show a loading spinner while waiting.
+2. When the response returns, update the UI to show the 'Original X-Ray' next to the base64 'Grad-CAM Heatmap'.
+3. Add a Bar Chart using the recharts library to display the confidence scores returned by the API. The x-axis should be the Pathology, and the y-axis should be the Confidence %.
+4. Add a clean text area below the visuals labeled 'Doctor's Clinical Notes'.
+Provide the completely updated App.jsx code."Phase 5: The Skin (Reporting & PDF Export)Goal: Implement the final PRD requirement, allowing doctors to export the results as a PDF.Prompt for your AI:"I need to add a PDF export feature to my React App.jsx using jsPDF and html2canvas.Requirements:
+1. Add a 'Download Clinical Report' button.
+2. When clicked, it should capture a specific div (which contains the original image, the heatmap, the Recharts bar chart, and the text from the Doctor's Notes).
+3. Format the PDF cleanly so it looks like a professional medical document (add a header that says 'MediScan AI Clinical Report' and a timestamp).
+4. Save the file as mediscan_report.pdf.
+Provide the code snippets specifically needed to add this export functionality."

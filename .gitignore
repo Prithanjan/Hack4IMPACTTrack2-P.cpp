@@ -1,0 +1,43 @@
+# ── Node / Frontend ──────────────────────────────────
+node_modules/
+dist/
+.vite/
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/
+
+# ── Python / Backend ─────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.env
+venv/
+.venv/
+env/
+
+# ── Environment / Secrets ────────────────────────────
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+*.env
+
+# ── Markdown docs (per user request) ─────────────────
+README.md
+*.md
+!prd.txt
+
+# ── Editor / OS ──────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# ── Design reference files (large/unnecessary) ───────
+design_reference/
+mediscan-ai-prd-updated.pdf
+
+# ── Brain / AI assistant artifacts ───────────────────
+.gemini/
