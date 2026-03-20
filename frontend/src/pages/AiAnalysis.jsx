@@ -1,16 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 export default function AiAnalysis() {
+  const { user, refreshProfile } = useAuth();
   const [imagePreview, setImagePreview] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [isExporting, setIsExporting] = useState(false);
   const [gatekeeperError, setGatekeeperError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
   const reportRef = useRef(null);
 
-  // Demo Dataset — 6 pre-loaded samples (3 normal, 2 pneumonia, 1 uncertain)
   const demoImages = [
     { id: 1, type: 'Normal',    name: 'demo_normal_1.jpg',   icon: 'check_circle', label: 'Normal #1' },
     { id: 2, type: 'Normal',    name: 'demo_normal_2.jpg',   icon: 'check_circle', label: 'Normal #2' },
@@ -21,7 +23,6 @@ export default function AiAnalysis() {
   ];
 
   const handleDemoClick = (demoItem) => {
-    // Generate a minimal valid PNG so the backend gatekeeper passes
     const byteString = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
@@ -29,9 +30,10 @@ export default function AiAnalysis() {
     const blob = new Blob([ab], { type: 'image/png' });
     const file = new File([blob], demoItem.name, { type: 'image/png' });
     setSelectedFile(file);
-    setImagePreview(null); // Will show demo label overlay
+    setImagePreview(null);
     setAnalysisResult(null);
     setGatekeeperError(null);
+    setSaveError(null);
   };
 
   const onDrop = (acceptedFiles) => {
@@ -41,6 +43,7 @@ export default function AiAnalysis() {
       setImagePreview(URL.createObjectURL(file));
       setAnalysisResult(null);
       setGatekeeperError(null);
+      setSaveError(null);
     }
   };
 
@@ -48,6 +51,7 @@ export default function AiAnalysis() {
     if (!selectedFile) return;
     setIsAnalyzing(true);
     setGatekeeperError(null);
+    setSaveError(null);
 
     const formData = new FormData();
     formData.append('file', selectedFile);
@@ -58,26 +62,48 @@ export default function AiAnalysis() {
 
       if (data.status === 'success') {
         setAnalysisResult(data);
+
+        // ── Save scan to Supabase ─────────────────────────────────────
+        if (user) {
+          const top = data.predictions[0];
+          const { error: insertError } = await supabase.from('scans').insert({
+            user_id: user.id,
+            filename: selectedFile.name,
+            top_diagnosis: top.class,
+            confidence: parseFloat(top.confidence.toFixed(2)),
+            urgency: data.clinical_interpretation?.urgency ?? 'low',
+            icd10: data.clinical_interpretation?.icd10 ?? '',
+            models_used: data.models_used,
+            latency_ms: data.latency_ms,
+            cached: data.cached,
+          });
+
+          if (insertError) {
+            console.warn('Scan save failed:', insertError.message);
+            setSaveError('Scan result could not be saved to your records. Check Supabase table setup.');
+          } else {
+            // Refresh profile to update total_scans counter
+            await refreshProfile();
+            // Notify Dashboard/Records to reload
+            window.dispatchEvent(new CustomEvent('scanSaved'));
+          }
+        }
+
         window.dispatchEvent(new Event('aiResult'));
       } else if (data.gatekeeper === 'REJECTED') {
         setGatekeeperError(data.message || 'Image Quality Check failed. Please upload a valid X-ray.');
-      } else {
-        console.error('Analysis failed:', data.message);
       }
     } catch (error) {
       console.error('Backend connection error:', error);
+      setGatekeeperError('Could not reach the backend. Make sure the Flask server is running on port 5000.');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleExportPDF = () => {
-    alert('Export feature will be available after server restart.');
-  };
-
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'], 'application/dicom': ['.dcm'] },
+    accept: { 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'] },
     maxFiles: 1,
   });
 
@@ -85,7 +111,6 @@ export default function AiAnalysis() {
     !analysisResult.confidence_floor_passed ||
     analysisResult.predictions[0].confidence < 70.0
   );
-
   const topPrediction = analysisResult?.predictions?.[0];
   const interp = analysisResult?.clinical_interpretation;
   const heatmapSrc = analysisResult?.heatmap_base64
@@ -176,10 +201,18 @@ export default function AiAnalysis() {
               </div>
             )}
 
+            {/* Save error */}
+            {saveError && (
+              <div className="mt-2.5 p-3 rounded-md bg-yellow-50/80 border border-yellow-200 flex items-start gap-2">
+                <span className="material-symbols-outlined text-[15px] text-yellow-600 shrink-0 mt-0.5">warning</span>
+                <p className="text-[11px] text-yellow-800 font-medium leading-tight">{saveError}</p>
+              </div>
+            )}
+
             {/* Privacy Disclaimer */}
             <p className="text-[11px] text-green-600/80 font-medium flex items-start gap-1.5 mt-2.5 bg-green-500/10 p-2.5 rounded-md border border-green-500/20 leading-tight">
               <span className="material-symbols-outlined text-[14px] text-green-500 shrink-0 mt-0.5">lock</span>
-              <span>Images are processed in-memory and discarded immediately after analysis. <strong>HIPAA Compliant.</strong></span>
+              <span>Images are processed in-memory and discarded immediately. <strong>HIPAA Compliant.</strong></span>
             </p>
           </div>
 
@@ -200,25 +233,12 @@ export default function AiAnalysis() {
             }
             <span>{isAnalyzing ? 'Running Ensemble Analysis...' : 'Analyze Scan'}</span>
           </button>
-
-          {/* Export PDF */}
-          <button
-            disabled={!analysisResult || isExporting}
-            onClick={handleExportPDF}
-            className={`w-full font-semibold py-2.5 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm
-              ${analysisResult && !isExporting
-                ? 'bg-[var(--color-surface-container-high)] text-[var(--color-primary)] hover:bg-[var(--color-surface-container-highest)]'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
-          >
-            <span className="material-symbols-outlined text-lg">{isExporting ? 'progress_activity' : 'picture_as_pdf'}</span>
-            <span>{isExporting ? 'Generating...' : 'Export PDF Report'}</span>
-          </button>
         </div>
 
         {/* ── RIGHT COLUMN ── */}
         <div className="lg:col-span-8 space-y-6" ref={reportRef}>
 
-          {/* Heatmap + Original image row */}
+          {/* Image row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
             {/* Original Radiograph */}
@@ -231,7 +251,6 @@ export default function AiAnalysis() {
                 {imagePreview ? (
                   <img alt="Uploaded X-Ray" className="w-full h-full object-cover grayscale brightness-90 contrast-125" src={imagePreview} />
                 ) : selectedFile?.name?.startsWith('demo_') ? (
-                  /* Demo label overlay for invisible 1×1 PNG */
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--color-surface-container-highest)] gap-2">
                     <span className={`material-symbols-outlined text-4xl ${selectedFile.name.startsWith('demo_normal') ? 'text-green-500' : selectedFile.name.startsWith('demo_abnormal') ? 'text-red-400' : 'text-yellow-500'}`}>
                       {selectedFile.name.startsWith('demo_normal') ? 'check_circle' : selectedFile.name.startsWith('demo_abnormal') ? 'coronavirus' : 'help'}
@@ -258,18 +277,16 @@ export default function AiAnalysis() {
               </div>
               <div className="aspect-[4/5] bg-[var(--color-surface-container-highest)] rounded-xl overflow-hidden border border-[var(--color-outline-variant)]/20 relative flex items-center justify-center">
                 {isLowConfidence ? (
-                  /* Grad-CAM Safety Rails */
-                  <div className="w-full h-full flex flex-col items-center justify-center space-y-3 p-5 bg-[var(--color-error-container)]/10 border border-[var(--color-error)]/20">
-                    <span className="material-symbols-outlined text-5xl text-[var(--color-error)] w-16 h-16 rounded-full flex items-center justify-center bg-[var(--color-error-container)]/20 border border-[var(--color-error)]/30">warning</span>
+                  <div className="w-full h-full flex flex-col items-center justify-center space-y-3 p-5 bg-red-500/5 border border-red-500/20">
+                    <span className="material-symbols-outlined text-5xl text-red-500">warning</span>
                     <div className="space-y-1 text-center">
-                      <p className="text-sm font-bold text-[var(--color-error)]">Uncertain Prediction</p>
+                      <p className="text-sm font-bold text-red-500">Uncertain Prediction</p>
                       <p className="text-xs text-[var(--color-on-surface-variant)] font-medium max-w-[190px] mx-auto leading-relaxed">
-                        Confidence below 70% threshold. Heatmap disabled. Manual radiologist review required.
+                        Confidence below 70% threshold. Heatmap disabled. Manual review required.
                       </p>
                     </div>
                   </div>
                 ) : heatmapSrc ? (
-                  /* Real Grad-CAM heatmap image from backend */
                   <img alt="Grad-CAM Heatmap" className="w-full h-full object-cover" src={heatmapSrc} />
                 ) : (
                   <div className="text-center p-4">
@@ -278,13 +295,9 @@ export default function AiAnalysis() {
                   </div>
                 )}
               </div>
-
-              {/* Heatmap legend (only when heatmap shown) */}
               {heatmapSrc && !isLowConfidence && (
                 <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-1">
-                    <div className="w-16 h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #0000c8, #00ff00, #ffff00, #ff0000)' }} />
-                  </div>
+                  <div className="w-16 h-1.5 rounded-full" style={{ background: 'linear-gradient(to right, #0000c8, #00ff00, #ffff00, #ff0000)' }} />
                   <div className="flex gap-3 text-[9px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-wider">
                     <span>Low</span><span>→</span><span className="text-red-500">High</span>
                   </div>
@@ -294,7 +307,7 @@ export default function AiAnalysis() {
           </div>
 
           {/* Diagnostic Probabilities */}
-          <div className={`bg-[var(--color-surface-container-lowest)] p-5 rounded-xl shadow-sm space-y-4 transition-all duration-500 ${analysisResult ? 'opacity-100 shadow-md border border-[var(--color-primary)]/20' : 'opacity-50 pointer-events-none'}`}>
+          <div className={`bg-[var(--color-surface-container-lowest)] p-5 rounded-xl shadow-sm space-y-4 transition-all duration-500 ${analysisResult ? 'opacity-100 border border-[var(--color-primary)]/20' : 'opacity-50 pointer-events-none'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold font-[var(--font-headline)] text-[var(--color-on-surface)] flex items-center gap-2">
@@ -311,41 +324,33 @@ export default function AiAnalysis() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-on-surface-variant)]">
-                <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-primary)]"></span>
-                AI Score
-              </div>
             </div>
-
             <div className="space-y-3">
               {analysisResult ? (
                 analysisResult.predictions.map((pred, i) => (
                   <div key={i} className="space-y-1">
                     <div className="flex justify-between items-end">
                       <span className="text-sm font-semibold text-[var(--color-on-surface)]">{pred.class}</span>
-                      <span className="text-sm font-bold text-[var(--color-primary)] font-[var(--font-headline)]">{pred.confidence.toFixed(1)}%</span>
+                      <span className="text-sm font-bold text-[var(--color-primary)]">{pred.confidence.toFixed(1)}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-[var(--color-surface-container-high)] rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-1000 ${isLowConfidence && i === 0 ? 'bg-[var(--color-error)]' : 'bg-[var(--color-primary)]'}`}
-                        style={{ width: `${pred.confidence}%`, boxShadow: isLowConfidence && i === 0 ? 'none' : '0 0 12px rgba(180,197,255,0.4)' }}
+                        className={`h-full rounded-full transition-all duration-1000 ${isLowConfidence && i === 0 ? 'bg-red-500' : 'bg-[var(--color-primary)]'}`}
+                        style={{ width: `${pred.confidence}%` }}
                       />
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="space-y-1">
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm font-semibold text-[var(--color-on-surface)]">Awaiting Analysis...</span>
-                    <span className="text-sm font-bold text-[var(--color-primary)]">— %</span>
-                  </div>
+                  <div className="flex justify-between"><span className="text-sm text-[var(--color-on-surface)]">Awaiting Analysis...</span><span className="text-sm text-[var(--color-primary)]">— %</span></div>
                   <div className="h-1.5 w-full bg-[var(--color-surface-container-high)] rounded-full" />
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── Clinical Interpretation Block ── */}
+          {/* Clinical Interpretation */}
           {interp && (
             <div className={`rounded-xl border ${urgency.border} ${urgency.bg} p-5 space-y-4`}>
               <div className="flex items-start justify-between">
@@ -362,17 +367,14 @@ export default function AiAnalysis() {
                   {interp.urgency === 'high' ? '🔴 Urgent' : interp.urgency === 'moderate' ? '🟡 Moderate' : '🟢 Routine'}
                 </span>
               </div>
-
               <div className="space-y-1">
                 <p className="text-xs font-bold text-[var(--color-on-surface)]">{interp.finding}</p>
                 <p className="text-[11px] text-[var(--color-on-surface-variant)] leading-relaxed">{interp.description}</p>
               </div>
-
               <div className="border-t border-[var(--color-outline-variant)]/30 pt-3 space-y-1">
                 <p className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-on-surface-variant)]">Clinical Recommendation</p>
                 <p className="text-[11px] text-[var(--color-on-surface-variant)] leading-relaxed">{interp.recommendation}</p>
               </div>
-
               <div className="flex items-center gap-2 pt-1">
                 <span className="material-symbols-outlined text-[13px] text-[var(--color-outline)]">info</span>
                 <p className="text-[10px] text-[var(--color-outline)] leading-tight">
@@ -381,7 +383,6 @@ export default function AiAnalysis() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     </main>

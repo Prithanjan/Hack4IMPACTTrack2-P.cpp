@@ -9,23 +9,32 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(userId) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (!error && data) setProfile(data);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (!error && data) setProfile(data);
+    } catch (_) {
+      // Profile fetch failing shouldn't block the app
+    }
   }
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Safety net: never show loading spinner for more than 4 seconds
+    const timeout = setTimeout(() => setLoading(false), 4000);
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
+      if (session?.user) await fetchProfile(session.user.id);
+      clearTimeout(timeout);
+      setLoading(false);
+    }).catch(() => {
+      clearTimeout(timeout);
       setLoading(false);
     });
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUser(session?.user ?? null);
@@ -34,11 +43,10 @@ export function AuthProvider({ children }) {
         } else {
           setProfile(null);
         }
-        setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
   }, []);
 
   async function signUp({ email, password, fullName, role }) {
@@ -48,13 +56,12 @@ export function AuthProvider({ children }) {
       options: { data: { full_name: fullName } },
     });
     if (error) throw error;
-
-    // Upsert profile with role immediately (trigger sets full_name, but we add role)
     if (data.user) {
       await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: fullName,
         role,
+        total_scans: 0,
       });
     }
     return data;
@@ -68,6 +75,8 @@ export function AuthProvider({ children }) {
 
   async function signOut() {
     await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
   }
 
   async function updateProfile(updates) {
@@ -81,8 +90,13 @@ export function AuthProvider({ children }) {
     if (!error && data) setProfile(data);
   }
 
+  // Refresh profile from DB (called after a scan is saved)
+  async function refreshProfile() {
+    if (user) await fetchProfile(user.id);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

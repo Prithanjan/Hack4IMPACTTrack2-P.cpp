@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   TrendingUp, AlertTriangle, ChevronRight,
   BrainCircuit, Network, Ruler, Copy, PenTool, Share, Sparkles, 
   Activity, Shield, Zap, Globe
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 /* ─── ECG Line ─────────────────────────────────────────────────────── */
 function ECGLine({ className = '' }) {
@@ -140,8 +142,27 @@ function LiveDot({ color = '#4ade80' }) {
   );
 }
 
+// ── Daily rotating AI insight (one per weekday) ───────────────────────────
+const AI_INSIGHTS = [
+  { text: 'Pulmonary nodule detection accuracy has improved by 14% this month with DenseNet121 v2025 updates. Ensure your dataset is current for optimal triage.', tag: 'Model Update' },
+  { text: 'Grad-CAM spatial resolution is highest when input images are ≥512px. Lower-res images may show wider activation zones — re-scan if borderline.', tag: 'XAI Tip' },
+  { text: 'Early-stage pleural effusion presents as blunting of costophrenic angles. High sensitivity (>90%) achieved when combined with lateral view inputs.', tag: 'Clinical Note' },
+  { text: 'Ensemble models (ResNet50 + DenseNet121) reduce single-model bias. Confidence variance across both models is a strong uncertainty signal.', tag: 'Research' },
+  { text: 'COVID-19 pneumonia often shows bilateral, peripheral ground-glass opacity. Use the "Uncertain" flag for any atypical multi-focal presentation.', tag: 'Diagnostic' },
+  { text: 'Inference cache hit rate above 70% indicates repeated demo usage — ideal for demonstrations. Real-world cache rates are typically 15–25%.', tag: 'Performance' },
+  { text: 'HIPAA-compliant deployments require zero image retention. All images in this system are discarded in-memory post-inference — no storage occurs.', tag: 'Compliance' },
+];
+
+function formatScanDate(ts) {
+  return new Date(ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 export default function Dashboard() {
+  const { user } = useAuth();
   const canvasRef = useRef(null);
+  const [stats, setStats] = useState({ total: 0, pending: 0, critical: 0 });
+  const [recentScans, setRecentScans] = useState([]);
+  const todayInsight = AI_INSIGHTS[new Date().getDay() % AI_INSIGHTS.length];
 
   /* ─── Particle canvas (reads CSS vars so it adapts to theme) ───── */
   useEffect(() => {
@@ -200,6 +221,32 @@ export default function Dashboard() {
     draw();
     window.addEventListener('resize', resize);
     return () => { cancelAnimationFrame(animId); window.removeEventListener('resize', resize); };
+  }, []);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data: scans } = await supabase
+        .from('scans')
+        .select('id, filename, top_diagnosis, confidence, urgency, created_at, cached, latency_ms')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (scans) {
+        const total = scans.length;
+        const critical = scans.filter(s => s.urgency === 'high' || s.top_diagnosis === 'Pneumonia').length;
+        const pending = scans.filter(s => s.urgency === 'moderate').length;
+        setStats({ total, pending, critical });
+        setRecentScans(scans.slice(0, 5));
+      }
+    } catch (_) { /* Supabase table may not exist yet */ }
+  }, [user]);
+
+  useEffect(() => {
+    fetchDashboardData();
+    const handler = () => fetchDashboardData();
+    window.addEventListener('scanSaved', handler);
+    return () => window.removeEventListener('scanSaved', handler);
   }, []);
 
   return (
@@ -270,13 +317,15 @@ export default function Dashboard() {
                 }} />
               </button>
             </Link>
-            <button className="px-7 py-3.5 rounded-xl font-bold text-sm transition-all" style={{
-              background: 'var(--color-surface-container)',
-              color: 'var(--color-on-surface)',
-              border: '1px solid var(--color-outline-variant)',
-            }}>
-              <span className="flex items-center gap-2"><Globe size={16} />Clinical Database</span>
-            </button>
+            <Link to="/records">
+              <button className="px-7 py-3.5 rounded-xl font-bold text-sm transition-all" style={{
+                background: 'var(--color-surface-container)',
+                color: 'var(--color-on-surface)',
+                border: '1px solid var(--color-outline-variant)',
+              }}>
+                <span className="flex items-center gap-2"><Globe size={16} />Clinical Database</span>
+              </button>
+            </Link>
           </div>
         </div>
 
@@ -343,11 +392,11 @@ export default function Dashboard() {
 
         {/* Stat cards */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <StatCard label="Total Scans" value={0} subtext="For current fiscal quarter"
-            icon={<Activity size={22} />} accent="var(--color-primary)" badge="Q1 2026" />
-          <StatCard label="Pending Reviews" value={0} subtext="Avg response time: 4.2 mins"
+          <StatCard label="Total Scans" value={stats.total} subtext="All time, your account"
+            icon={<Activity size={22} />} accent="var(--color-primary)" badge="LIVE" />
+          <StatCard label="Pending Reviews" value={stats.pending} subtext="Moderate urgency findings"
             icon={<TrendingUp size={22} />} accent="#818cf8" />
-          <StatCard label="Critical Findings" value={0} subtext="Immediate attention required in ER"
+          <StatCard label="Critical Findings" value={stats.critical} subtext="Urgent or Pneumonia cases"
             icon={<AlertTriangle size={22} />} accent="var(--color-error)" />
         </section>
 
@@ -380,24 +429,46 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td colSpan="5" className="px-6 py-14 text-center">
-                      <div className="flex flex-col items-center gap-4">
-                        <ScanningRing size={56} color="var(--color-outline)" speed={5} />
-                        <p className="text-sm font-medium" style={{ color: 'var(--color-on-surface-variant)' }}>
-                          No scans yet. Upload a radiograph to begin.
-                        </p>
-                        <Link to="/analysis">
-                          <button className="px-5 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 active:scale-95" style={{
-                            background: 'var(--color-primary)',
-                            color: 'var(--color-on-primary)',
-                          }}>
-                            Start First Scan
-                          </button>
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
+                  {recentScans.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-14 text-center">
+                        <div className="flex flex-col items-center gap-4">
+                          <ScanningRing size={56} color="var(--color-outline)" speed={5} />
+                          <p className="text-sm font-medium" style={{ color: 'var(--color-on-surface-variant)' }}>No scans yet. Upload a radiograph to begin.</p>
+                          <Link to="/analysis">
+                            <button className="px-5 py-2 rounded-xl text-xs font-bold hover:opacity-90 active:scale-95" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>Start First Scan</button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : recentScans.map(scan => (
+                    <tr key={scan.id} style={{ borderTop: '1px solid var(--color-surface-container)' }}>
+                      <td className="px-6 py-4 text-xs font-mono font-bold" style={{ color: 'var(--color-outline)' }}>
+                        MSC-{scan.id.substring(0, 6).toUpperCase()}
+                      </td>
+                      <td className="px-6 py-4 text-xs font-semibold" style={{ color: 'var(--color-on-surface)' }}>X-Ray</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1 w-14 rounded-full" style={{ background: 'var(--color-surface-container-high)' }}>
+                            <div className="h-full rounded-full" style={{ width: `${scan.confidence ?? 0}%`, background: 'var(--color-primary)' }} />
+                          </div>
+                          <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>{scan.confidence?.toFixed(1) ?? '—'}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          scan.urgency === 'high' ? 'bg-red-500/10 text-red-500' :
+                          scan.urgency === 'moderate' ? 'bg-yellow-500/10 text-yellow-600' :
+                          'bg-green-500/10 text-green-600'
+                        }`}>
+                          {scan.top_diagnosis ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-[10px]" style={{ color: 'var(--color-outline)' }}>{formatScanDate(scan.created_at)}</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -534,25 +605,29 @@ export default function Dashboard() {
                   }}>V2.4 LATEST</span>
                 </div>
 
-                <h4 className="text-base font-bold mt-4 relative z-10" style={{ color: 'var(--color-on-surface)' }}>
-                  AI Insight of the Day
-                </h4>
+                <div className="flex items-center justify-between mt-4 relative z-10">
+                  <h4 className="text-base font-bold" style={{ color: 'var(--color-on-surface)' }}>AI Insight of the Day</h4>
+                  <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full" style={{ background: 'var(--color-surface-container-high)', color: 'var(--color-primary)', border: '1px solid var(--color-outline-variant)' }}>
+                    {todayInsight.tag}
+                  </span>
+                </div>
                 <p className="text-[11px] mt-2 leading-relaxed relative z-10" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  New pulmonary nodule detection models have increased accuracy by{' '}
-                  <strong style={{ color: 'var(--color-primary)' }}>14%</strong> this month. Ensure your dataset is updated for optimal triage.
+                  {todayInsight.text}
                 </p>
 
                 <div className="mt-4 mb-1 opacity-25 relative z-10" style={{ color: 'var(--color-primary)' }}>
                   <ECGLine className="w-full h-5" />
                 </div>
 
-                <button className="w-full mt-3 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-90 active:scale-95 relative z-10 flex items-center justify-center gap-2" style={{
-                  background: 'var(--color-primary)',
-                  color: 'var(--color-on-primary)',
-                  boxShadow: '0 4px 16px rgba(37,99,235,0.25)',
-                }}>
-                  <ChevronRight size={14} /> Explore Models
-                </button>
+                <Link to="/analysis" className="relative z-10">
+                  <button className="w-full mt-3 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2" style={{
+                    background: 'var(--color-primary)',
+                    color: 'var(--color-on-primary)',
+                    boxShadow: '0 4px 16px rgba(37,99,235,0.25)',
+                  }}>
+                    <ChevronRight size={14} /> Start New Analysis
+                  </button>
+                </Link>
               </div>
             </div>
 

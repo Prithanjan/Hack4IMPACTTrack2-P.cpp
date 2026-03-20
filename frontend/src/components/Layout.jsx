@@ -54,7 +54,6 @@ export default function Layout() {
 
   const toggleDarkMode = () => {
     if (isDarkMode) {
-      document.getElement.classifier(create)
       document.documentElement.classList.remove('dark');
       localStorage.theme = 'light';
       setIsDarkMode(false);
