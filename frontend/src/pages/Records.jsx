@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Filter } from 'lucide-react';
+import { Filter, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -23,11 +23,12 @@ function formatDate(ts) {
 export default function Records() {
   const { user, profile } = useAuth();
   const [activeFilter, setActiveFilter] = useState('All Records');
+  const [searchQuery, setSearchQuery] = useState('');
   const [scans, setScans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const filters = ['All Records', 'Normal', 'Pneumonia', 'Effusion', 'Uncertain'];
+  const filters = ['All Records', 'Normal', 'Pneumonia', 'Effusion', 'Bronchitis', 'Asthma', 'Rib Fracture', 'Uncertain'];
 
   const fetchScans = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -69,9 +70,20 @@ export default function Records() {
     return () => window.removeEventListener('scanSaved', handler);
   }, [fetchScans]);
 
+  const lowerQuery = searchQuery.toLowerCase();
+  const searchFiltered = scans.filter(s => {
+    if (!lowerQuery) return true;
+    return (
+      s.id?.toLowerCase().includes(lowerQuery) ||
+      s.top_diagnosis?.toLowerCase().includes(lowerQuery) ||
+      s.filename?.toLowerCase().includes(lowerQuery) ||
+      s.icd10?.toLowerCase().includes(lowerQuery)
+    );
+  });
+
   const filtered = activeFilter === 'All Records'
-    ? scans
-    : scans.filter(s => s.top_diagnosis?.toLowerCase() === activeFilter.toLowerCase()
+    ? searchFiltered
+    : searchFiltered.filter(s => s.top_diagnosis?.toLowerCase() === activeFilter.toLowerCase()
         || (activeFilter === 'Uncertain' && s.urgency === 'high'));
 
   const initials = profile?.full_name
@@ -106,9 +118,21 @@ export default function Records() {
         </p>
       </section>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row justify-between items-start md:items-center gap-4 py-2">
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* Filters and Search */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 py-2">
+        <div className="relative flex-1 w-full max-w-md">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={16} className="text-[var(--color-outline)]" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by ID, Diagnosis, ICD-10, or Filename..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-[var(--color-surface-container-lowest)] border border-[var(--color-outline-variant)]/50 rounded-xl text-sm text-[var(--color-on-surface)] placeholder:text-[var(--color-outline)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)]/50 transition-all font-medium"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap flex-1 justify-end">
           {filters.map((f) => (
             <button
               key={f}
@@ -123,9 +147,6 @@ export default function Records() {
             </button>
           ))}
         </div>
-        <button className="flex items-center gap-2 text-[var(--color-primary)] font-bold text-sm px-4 py-2 hover:bg-[var(--color-primary)]/5 rounded-lg transition-colors">
-          <Filter size={16} /> Advanced Filters
-        </button>
       </div>
 
       {/* Error banner */}

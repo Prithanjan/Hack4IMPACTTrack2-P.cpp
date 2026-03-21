@@ -234,7 +234,7 @@ export default function Dashboard() {
 
       if (scans) {
         const total = scans.length;
-        const critical = scans.filter(s => s.urgency === 'high' || s.top_diagnosis === 'Pneumonia').length;
+        const critical = scans.filter(s => s.urgency === 'high' || s.top_diagnosis === 'Pneumonia' || s.top_diagnosis === 'Rib Fracture').length;
         const pending = scans.filter(s => s.urgency === 'moderate').length;
         setStats({ total, pending, critical });
         setRecentScans(scans.slice(0, 5));

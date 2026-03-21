@@ -14,12 +14,12 @@ export default function AiAnalysis() {
   const reportRef = useRef(null);
 
   const demoImages = [
-    { id: 1, type: 'Normal',    name: 'demo_normal_1.jpg',   icon: 'check_circle', label: 'Normal #1' },
-    { id: 2, type: 'Normal',    name: 'demo_normal_2.jpg',   icon: 'check_circle', label: 'Normal #2' },
-    { id: 3, type: 'Normal',    name: 'demo_normal_3.jpg',   icon: 'check_circle', label: 'Normal #3' },
-    { id: 4, type: 'Pneumonia', name: 'demo_abnormal_1.jpg', icon: 'coronavirus',  label: 'Pneumonia #1' },
-    { id: 5, type: 'Pneumonia', name: 'demo_abnormal_2.jpg', icon: 'coronavirus',  label: 'Pneumonia #2' },
-    { id: 6, type: 'Uncertain', name: 'demo_low_conf_1.jpg', icon: 'help',         label: 'Uncertain #1' },
+    { id: 1, type: 'Normal',       name: 'demo_normal_1.jpg',     icon: 'check_circle', label: 'Normal' },
+    { id: 2, type: 'Pneumonia',    name: 'demo_abnormal_1.jpg',   icon: 'coronavirus',  label: 'Pneumonia' },
+    { id: 3, type: 'Asthma',       name: 'demo_asthma_1.jpg',     icon: 'air',          label: 'Asthma' },
+    { id: 4, type: 'Bronchitis',   name: 'demo_bronchitis_1.jpg', icon: 'pulmonology',  label: 'Bronchitis' },
+    { id: 5, type: 'Rib Fracture', name: 'demo_rib_fracture.jpg', icon: 'personal_injury',label: 'Rib Fracture' },
+    { id: 6, type: 'Uncertain',    name: 'demo_low_conf_1.jpg',   icon: 'help',         label: 'Uncertain' },
   ];
 
   const handleDemoClick = (demoItem) => {
