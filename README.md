@@ -67,36 +67,5 @@ $$L_{Grad-CAM}^c = \text{ReLU}\left(\sum_k \alpha_k^c A^k\right)$$
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Prithanjan/Hack4IMPACTTrack2-P.cpp.git
+git clone [https://github.com/Prithanjan/Hack4IMPACTTrack2-P.cpp.git](https://github.com/Prithanjan/Hack4IMPACTTrack2-P.cpp.git)
 cd Hack4IMPACTTrack2-P.cpp
-```
-
-### 2. Run the Backend (Flask API)
-```bash
-cd backend
-pip install -r requirements.txt
-py app.py
-```
-> ✅ API server starts at **http://localhost:5000**
-
-### 3. Run the Frontend (React + Vite)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-> ✅ App starts at **http://localhost:5173**
-
-### 4. Open the App
-Navigate to `http://localhost:5173` in your browser. Create an account, then head to **AI Analysis** to upload a chest X-ray or use one of the 6 pre-loaded demo samples.
-
----
-
-## 🔒 Privacy & Compliance
-All uploaded images are processed **in-memory only** and discarded immediately after inference. No patient data is persisted to any database. The system is designed with a HIPAA-compliant architecture by default.
-
----
-
-<div align="center">
-<sub>© 2026 Team P.cpp · KIIT University · Built for Hack4IMPACT Track 2</sub>
-</div>
