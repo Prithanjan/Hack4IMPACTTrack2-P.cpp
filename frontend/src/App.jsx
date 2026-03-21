@@ -24,9 +24,6 @@ function ProtectedRoute({ children }) {
 }
 
 function AppRoutes() {
-  const <Appdata>
-  ANNOTATE ON COMMAND  
-  </Appdata>
   const { user, loading } = useAuth();
 
   if (loading) {
