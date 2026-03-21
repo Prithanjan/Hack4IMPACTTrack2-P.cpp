@@ -57,7 +57,8 @@ export default function AiAnalysis() {
     formData.append('file', selectedFile);
 
     try {
-      const response = await fetch('http://localhost:5000/api/predict', { method: 'POST', body: formData });
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiBase}/api/predict`, { method: 'POST', body: formData });
       const data = await response.json();
 
       if (data.status === 'success') {

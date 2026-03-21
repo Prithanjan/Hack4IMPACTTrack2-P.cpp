@@ -30,9 +30,16 @@ export default function Records() {
   const filters = ['All Records', 'Normal', 'Pneumonia', 'Effusion', 'Uncertain'];
 
   const fetchScans = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     setLoading(true);
     setError(null);
+
+    // Timeout safety: if Supabase takes > 6s, show error instead of hanging
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setError('Request timed out. The scans table may not exist in Supabase yet. Run the SQL setup script to create it.');
+    }, 6000);
+
     try {
       const { data, error: fetchErr } = await supabase
         .from('scans')
@@ -40,11 +47,16 @@ export default function Records() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
+      clearTimeout(timeoutId);
       if (fetchErr) throw fetchErr;
       setScans(data ?? []);
     } catch (e) {
-      setError(e.message);
+      clearTimeout(timeoutId);
+      setError(e.message?.includes('does not exist') || e.code === '42P01'
+        ? 'The scans table does not exist yet. Please run the SQL setup script in your Supabase SQL Editor.'
+        : e.message);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [user]);

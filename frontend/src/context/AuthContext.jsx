@@ -74,9 +74,14 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
+    // Just call Supabase — onAuthStateChange fires and clears user/profile
+    try {
+      await supabase.auth.signOut();
+    } catch (_) {
+      // Force clear locally even if network fails
+      setUser(null);
+      setProfile(null);
+    }
   }
 
   async function updateProfile(updates) {

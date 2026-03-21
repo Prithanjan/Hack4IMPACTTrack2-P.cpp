@@ -46,10 +46,21 @@ export default function Layout() {
     };
   }, []);
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     setShowProfileMenu(false);
-    await signOut();
-    navigate('/login');
+    
+    // 1. Force-clear ALL Supabase auth tokens from localStorage to guarantee log out
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('sb-') || key.includes('supabase')) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    // 2. Tell the server to kill the session (don't await it so we never hang)
+    signOut().catch(err => console.error('Supabase signout failed:', err));
+
+    // 3. Hard navigate immediately so React Router and React state fully reset
+    window.location.href = '/login';
   };
 
   const toggleDarkMode = () => {
@@ -95,10 +106,17 @@ export default function Layout() {
         </nav>
 
         <div className="pt-4 mt-auto space-y-1">
-          <button className="w-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-container)] text-[var(--color-on-primary)] rounded-xl py-4 px-4 font-semibold text-sm shadow-md mb-6 active:scale-95 transition-transform flex items-center justify-center gap-2">
+          <a
+            href="tel:+911800425293"
+            title="Call National Emergency Medical Helpline"
+            className="w-full bg-gradient-to-br from-red-600 to-red-700 text-white rounded-xl py-4 px-4 font-semibold text-sm shadow-md mb-2 active:scale-95 transition-transform flex items-center justify-center gap-2 hover:from-red-500 hover:to-red-600"
+          >
             <span className="material-symbols-outlined text-sm">emergency</span>
             Emergency Priority
-          </button>
+          </a>
+          <p className="text-[10px] text-center text-[var(--color-on-surface-variant)] mb-4 leading-tight">
+            Radiology Helpline: <span className="font-bold text-red-400">1800-425-0293</span>
+          </p>
           <a className="flex items-center gap-3 text-[var(--color-on-surface-variant)] px-4 py-3 hover:bg-[var(--color-surface-container-highest)] rounded-lg transition-colors" href="mailto:prithanjan2006@gmail.com">
             <HelpCircle size={20} />
             <span className="text-sm">Support</span>

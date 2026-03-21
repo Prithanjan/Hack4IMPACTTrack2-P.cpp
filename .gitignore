@@ -38,3 +38,10 @@ design_reference/
 
 # ── Brain / AI assistant artifacts ───────────────────
 .gemini/
+
+# ── Large Model Files & PDFs ─────────────────────────
+backend/resnet50.onnx
+*.pdf
+*.txt
+!requirements.txt
+git_*.txt
