@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Filter, Search } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Filter, Search, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 
@@ -90,6 +91,45 @@ export default function Records() {
     ? profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : '?';
 
+  // ── Trend Analysis ──────────────────────────────────────────
+  const trendData = useMemo(() => {
+    const sortedScans = [...scans].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    return sortedScans.map((scan, idx) => ({
+      date: new Date(scan.created_at).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+      confidence: scan.confidence || 0,
+      diagnosis: scan.top_diagnosis || 'Unknown',
+      urgency: scan.urgency || 'low',
+      fullDate: scan.created_at,
+      index: idx,
+    }));
+  }, [scans]);
+
+  const conditionTrend = useMemo(() => {
+    if (trendData.length === 0) return { trend: 'neutral', change: 0, message: 'No data' };
+    
+    const recentScans = trendData.slice(-5);
+    const avgConfidence = recentScans.reduce((sum, s) => sum + s.confidence, 0) / recentScans.length;
+    const olderScans = trendData.slice(0, Math.max(1, trendData.length - 5));
+    const oldAvgConfidence = olderScans.reduce((sum, s) => sum + s.confidence, 0) / olderScans.length;
+    
+    const confChange = avgConfidence - oldAvgConfidence;
+    const normalCount = trendData.filter(s => s.diagnosis === 'Normal').length;
+    const abnormalCount = trendData.filter(s => s.diagnosis !== 'Normal' && s.diagnosis !== 'Unknown').length;
+
+    let trend = 'neutral';
+    if (confChange > 5) trend = 'improving';
+    else if (confChange < -5) trend = 'declining';
+    
+    return {
+      trend,
+      change: confChange,
+      normalCount,
+      abnormalCount,
+      recentAvg: avgConfidence,
+      message: trend === 'improving' ? 'Condition improving' : trend === 'declining' ? 'Condition declining' : 'Stable condition',
+    };
+  }, [trendData]);
+
   return (
     <main className="p-6 md:p-8 max-w-5xl w-full mx-auto space-y-8 py-10 flex-1">
 
@@ -117,6 +157,117 @@ export default function Records() {
           Complete history of AI-assisted radiology analyses linked to your account.
         </p>
       </section>
+
+      {/* Health Trend Section */}
+      {scans.length > 1 && (
+        <section className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {/* Trend Status Card */}
+            <div className="lg:col-span-1 rounded-2xl p-5 border border-[var(--color-outline-variant)]/30 bg-[var(--color-surface-container-lowest)] space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-outline)]">Condition Status</h3>
+              
+              <div className="flex items-center gap-3">
+                {conditionTrend.trend === 'improving' ? (
+                  <div className="w-10 h-10 rounded-lg bg-green-500/15 flex items-center justify-center text-green-600">
+                    <TrendingUp size={20} />
+                  </div>
+                ) : conditionTrend.trend === 'declining' ? (
+                  <div className="w-10 h-10 rounded-lg bg-red-500/15 flex items-center justify-center text-red-600">
+                    <TrendingDown size={20} />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-yellow-500/15 flex items-center justify-center text-yellow-600">
+                    <Minus size={20} />
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-bold" style={{color: conditionTrend.trend === 'improving' ? '#4ade80' : conditionTrend.trend === 'declining' ? '#ef4444' : '#eab308'}}>
+                    {conditionTrend.message}
+                  </p>
+                  <p className="text-xs text-[var(--color-on-surface-variant)]">
+                    {Math.abs(conditionTrend.change).toFixed(1)}% {conditionTrend.change > 0 ? 'gain' : 'loss'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-[var(--color-outline-variant)]/20">
+                <div>
+                  <p className="text-[10px] text-[var(--color-on-surface-variant)] uppercase font-bold">Normal Scans</p>
+                  <p className="text-lg font-black text-green-600">{conditionTrend.normalCount}/{trendData.length}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[var(--color-on-surface-variant)] uppercase font-bold">Findings</p>
+                  <p className="text-lg font-black text-red-600">{conditionTrend.abnormalCount}/{trendData.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Confidence Trend Chart */}
+            <div className="lg:col-span-3 rounded-2xl p-5 border border-[var(--color-outline-variant)]/30 bg-[var(--color-surface-container-lowest)] overflow-hidden">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-outline)] mb-4">Confidence Trend</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" opacity={0.2} />
+                  <XAxis dataKey="date" stroke="var(--color-on-surface-variant)" style={{fontSize: '11px'}} />
+                  <YAxis stroke="var(--color-on-surface-variant)" style={{fontSize: '11px'}} domain={[0, 100]} />
+                  <RechartsTooltip 
+                    contentStyle={{
+                      background: 'var(--color-surface-container)',
+                      border: '1px solid var(--color-outline-variant)',
+                      borderRadius: '8px',
+                      color: 'var(--color-on-surface)',
+                    }}
+                    formatter={(value) => [`${value.toFixed(1)}%`, 'Confidence']}
+                    labelFormatter={(label) => `Date: ${label}`}
+                  />
+                  <Area type="monotone" dataKey="confidence" stroke="var(--color-primary)" strokeWidth={2} fillOpacity={1} fill="url(#colorConfidence)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Diagnosis Distribution */}
+          <div className="rounded-2xl p-5 border border-[var(--color-outline-variant)]/30 bg-[var(--color-surface-container-lowest)]">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-outline)] mb-4">Diagnosis Distribution</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={Object.entries(
+                trendData.reduce((acc, scan) => {
+                  acc[scan.diagnosis] = (acc[scan.diagnosis] || 0) + 1;
+                  return acc;
+                }, {})
+              ).map(([diagnosis, count]) => ({ diagnosis, count }))}
+              margin={{ top: 10, right: 10, left: -25, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" opacity={0.2} />
+                <XAxis 
+                  dataKey="diagnosis" 
+                  stroke="var(--color-on-surface-variant)"
+                  style={{fontSize: '11px'}}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis stroke="var(--color-on-surface-variant)" style={{fontSize: '11px'}} />
+                <RechartsTooltip 
+                  contentStyle={{
+                    background: 'var(--color-surface-container)',
+                    border: '1px solid var(--color-outline-variant)',
+                    borderRadius: '8px',
+                    color: 'var(--color-on-surface)',
+                  }}
+                  formatter={(value) => [value, 'Count']}
+                />
+                <Bar dataKey="count" fill="var(--color-primary)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
 
       {/* Filters and Search */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 py-2">

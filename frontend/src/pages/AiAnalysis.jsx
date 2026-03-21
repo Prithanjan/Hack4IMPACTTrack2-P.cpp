@@ -1,10 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 export default function AiAnalysis() {
   const { user, refreshProfile } = useAuth();
+  const { addNotification } = useNotification();
   const [imagePreview, setImagePreview] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -63,15 +66,43 @@ export default function AiAnalysis() {
 
       if (data.status === 'success') {
         setAnalysisResult(data);
+        const topPrediction = data.predictions[0];
+
+        // ── Send personalized notification ───────────────────────
+        const notificationType = 
+          data.clinical_interpretation?.urgency === 'high' ? 'error' :
+          data.clinical_interpretation?.urgency === 'moderate' ? 'warning' :
+          'success';
+
+        const notificationIcon = 
+          topPrediction.class === 'Normal' ? <CheckCircle size={20} style={{ color: '#4ade80' }} /> :
+          topPrediction.class === 'Pneumonia' ? <AlertCircle size={20} style={{ color: '#ef4444' }} /> :
+          <Info size={20} style={{ color: '#3b82f6' }} />;
+
+        addNotification({
+          type: notificationType,
+          icon: notificationIcon,
+          title: `✓ ${topPrediction.class} Detected`,
+          message: `Analysis complete. Confidence: ${topPrediction.confidence.toFixed(1)}%`,
+          duration: 8000,
+          personalized: {
+            diagnosis: topPrediction.class,
+            confidence: topPrediction.confidence.toFixed(1),
+            patientId: `MSC-${user.id.substring(0, 6).toUpperCase()}`,
+          },
+          action: {
+            label: 'View Results',
+            callback: () => window.scrollTo({ top: 0, behavior: 'smooth' })
+          }
+        });
 
         // ── Save scan to Supabase ─────────────────────────────────────
         if (user) {
-          const top = data.predictions[0];
           const { error: insertError } = await supabase.from('scans').insert({
             user_id: user.id,
             filename: selectedFile.name,
-            top_diagnosis: top.class,
-            confidence: parseFloat(top.confidence.toFixed(2)),
+            top_diagnosis: topPrediction.class,
+            confidence: parseFloat(topPrediction.confidence.toFixed(2)),
             urgency: data.clinical_interpretation?.urgency ?? 'low',
             icd10: data.clinical_interpretation?.icd10 ?? '',
             models_used: data.models_used,
@@ -89,14 +120,30 @@ export default function AiAnalysis() {
             window.dispatchEvent(new CustomEvent('scanSaved'));
           }
         }
-
-        window.dispatchEvent(new Event('aiResult'));
       } else if (data.gatekeeper === 'REJECTED') {
         setGatekeeperError(data.message || 'Image Quality Check failed. Please upload a valid X-ray.');
+        
+        // Send error notification
+        addNotification({
+          type: 'error',
+          icon: <AlertCircle size={20} style={{ color: '#ef4444' }} />,
+          title: 'Image Quality Check Failed',
+          message: data.message || 'The uploaded file is not a valid medical image.',
+          duration: 6000,
+        });
       }
     } catch (error) {
       console.error('Backend connection error:', error);
-      setGatekeeperError('Could not reach the backend. Make sure the Flask server is running on port 5000.');
+      const errorMsg = 'Could not reach the backend. Make sure the Flask server is running on port 5000.';
+      setGatekeeperError(errorMsg);
+
+      addNotification({
+        type: 'error',
+        icon: <AlertCircle size={20} style={{ color: '#ef4444' }} />,
+        title: 'Backend Connection Error',
+        message: 'Unable to reach the AI analysis server. Please try again.',
+        duration: 8000,
+      });
     } finally {
       setIsAnalyzing(false);
     }

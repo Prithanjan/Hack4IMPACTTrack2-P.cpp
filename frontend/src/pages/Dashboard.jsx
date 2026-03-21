@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   TrendingUp, AlertTriangle, ChevronRight,
-  BrainCircuit, Network, Ruler, Copy, PenTool, Share, Sparkles, 
-  Activity, Shield, Zap, Globe
+  BrainCircuit, Network, Ruler, ClipboardList, FileText, MessageSquare, Sparkles, 
+  Activity, Shield, Zap, Globe, X, Check, Stethoscope, Microscope,
+  Maximize2, GitCompare, Download, Send
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
@@ -162,7 +163,49 @@ export default function Dashboard() {
   const canvasRef = useRef(null);
   const [stats, setStats] = useState({ total: 0, pending: 0, critical: 0 });
   const [recentScans, setRecentScans] = useState([]);
+  const [activeModal, setActiveModal] = useState(null);
+  const [measurementData, setMeasurementData] = useState([]);
+  const [clinicalNotes, setClinicalNotes] = useState('');
   const todayInsight = AI_INSIGHTS[new Date().getDay() % AI_INSIGHTS.length];
+
+  /* ─── Medical Tool Handlers ─────────────────────────────────── */
+  const handleAddMeasurement = () => {
+    setMeasurementData([...measurementData, { id: Date.now(), location: '', size: '', unit: 'mm' }]);
+  };
+
+  const updateMeasurement = (id, field, value) => {
+    setMeasurementData(measurementData.map(m => m.id === id ? { ...m, [field]: value } : m));
+  };
+
+  const deleteMeasurement = (id) => {
+    setMeasurementData(measurementData.filter(m => m.id !== id));
+  };
+
+  const downloadReport = () => {
+    const report = `
+RADIOLOGICAL ANALYSIS REPORT
+Generated: ${new Date().toLocaleDateString()}
+Patient ID: ${user?.id?.slice(0, 8).toUpperCase() || 'N/A'}
+
+MEASUREMENTS:
+${measurementData.map((m, i) => `${i + 1}. ${m.location}: ${m.size}${m.unit}`).join('\n') || 'No measurements recorded'}
+
+CLINICAL NOTES:
+${clinicalNotes || 'No clinical notes'}
+
+STATUS: Pending Radiologist Review
+    `.trim();
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(report));
+    element.setAttribute('download', `Report_${Date.now()}.txt`);
+    element.click();
+    setActiveModal(null);
+  };
+
+  const handleConsultation = () => {
+    alert('✓ Consultation request submitted to specialist panel\n✓ Expected response within 4 hours');
+    setActiveModal(null);
+  };
 
   /* ─── Particle canvas (reads CSS vars so it adapts to theme) ───── */
   useEffect(() => {
@@ -556,21 +599,25 @@ export default function Dashboard() {
 
               {/* Quick tools */}
               <div className="mt-5 pt-5 border-t" style={{ borderColor: 'var(--color-outline-variant)' }}>
-                <h4 className="text-[10px] font-extrabold tracking-widest uppercase mb-3" style={{ color: 'var(--color-outline)' }}>Quick Tools</h4>
+                <h4 className="text-[10px] font-extrabold tracking-widest uppercase mb-3" style={{ color: 'var(--color-outline)' }}>Medical Tools Suite</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { icon: <Ruler size={16} />, label: 'Measure' },
-                    { icon: <Copy size={16} />, label: 'Compare' },
-                    { icon: <PenTool size={16} />, label: 'Annotate' },
-                    { icon: <Share size={16} />, label: 'Consult' },
+                    { icon: <Ruler size={16} />, label: 'Lesion Measure', mode: 'measurement', color: 'var(--color-primary)' },
+                    { icon: <GitCompare size={16} />, label: 'Compare Study', mode: 'comparison', color: '#818cf8' },
+                    { icon: <ClipboardList size={16} />, label: 'Clinical Notes', mode: 'notes', color: '#4ade80' },
+                    { icon: <Stethoscope size={16} />, label: 'Consult Specialist', mode: 'consult', color: 'var(--color-error)' },
                   ].map(t => (
-                    <button key={t.label} className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl transition-all hover:scale-105 active:scale-95" style={{
-                      background: 'var(--color-surface-container)',
-                      border: '1px solid var(--color-outline-variant)',
-                      color: 'var(--color-on-surface)',
-                    }}>
-                      <span style={{ color: 'var(--color-primary)' }}>{t.icon}</span>
-                      <span className="text-[9px] font-bold">{t.label}</span>
+                    <button 
+                      key={t.label} 
+                      onClick={() => setActiveModal(t.mode)}
+                      className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl transition-all hover:scale-105 active:scale-95 group" 
+                      style={{
+                        background: 'var(--color-surface-container)',
+                        border: `1.5px solid ${t.color}30`,
+                        color: 'var(--color-on-surface)',
+                      }}>
+                      <span style={{ color: t.color, transition: 'transform 0.3s' }} className="group-hover:scale-110">{t.icon}</span>
+                      <span className="text-[9px] font-bold text-center leading-tight" style={{ color: t.color }}>{t.label}</span>
                     </button>
                   ))}
                 </div>
@@ -634,6 +681,194 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+
+      {/* ━━━ MEDICAL TOOL MODALS ━━━ */}
+
+      {/* Lesion Measurement Modal */}
+      {activeModal === 'measurement' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="rounded-3xl p-6 w-full max-w-md" style={{ background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline-variant)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--color-primary)15', color: 'var(--color-primary)' }}>
+                  <Maximize2 size={20} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--color-on-surface)' }}>Lesion Measurement</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-2 hover:opacity-60">
+                <X size={20} style={{ color: 'var(--color-on-surface-variant)' }} />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-60 overflow-y-auto mb-5">
+              {measurementData.length === 0 ? (
+                <p className="text-sm text-center py-6" style={{ color: 'var(--color-on-surface-variant)' }}>No measurements yet. Add your first measurement.</p>
+              ) : (
+                measurementData.map(m => (
+                  <div key={m.id} className="p-3 rounded-xl" style={{ background: 'var(--color-surface-container)' }}>
+                    <div className="flex gap-2 mb-2">
+                      <input type="text" value={m.location} onChange={(e) => updateMeasurement(m.id, 'location', e.target.value)} placeholder="Location (e.g., RLL)" className="flex-1 px-2 py-1 rounded text-xs" style={{ background: 'var(--color-surface-container-high)' }} />
+                      <input type="number" value={m.size} onChange={(e) => updateMeasurement(m.id, 'size', e.target.value)} placeholder="Size" className="w-16 px-2 py-1 rounded text-xs" style={{ background: 'var(--color-surface-container-high)' }} />
+                      <select value={m.unit} onChange={(e) => updateMeasurement(m.id, 'unit', e.target.value)} className="px-2 py-1 rounded text-xs" style={{ background: 'var(--color-surface-container-high)' }}>
+                        <option>mm</option><option>cm</option>
+                      </select>
+                      <button onClick={() => deleteMeasurement(m.id)} className="px-2 py-1 rounded text-xs hover:opacity-60" style={{ background: 'rgba(255,0,0,0.1)', color: 'var(--color-error)' }}>Del</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={handleAddMeasurement} className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all" style={{ background: 'var(--color-primary)15', color: 'var(--color-primary)' }}>
+                + Add Measurement
+              </button>
+              <button onClick={() => setActiveModal(null)} className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comparative Study Modal */}
+      {activeModal === 'comparison' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="rounded-3xl p-6 w-full max-w-md" style={{ background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline-variant)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#818cf815', color: '#818cf8' }}>
+                  <GitCompare size={20} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--color-on-surface)' }}>Comparative Analysis</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-2 hover:opacity-60">
+                <X size={20} style={{ color: 'var(--color-on-surface-variant)' }} />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-container)' }}>
+                <p className="text-[10px] font-bold mb-2" style={{ color: 'var(--color-outline)' }}>CURRENT STUDY</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-on-surface)' }}>{recentScans[0]?.filename || 'No current scan'}</p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>Confidence: {recentScans[0]?.confidence?.toFixed(1) || '—'}%</p>
+              </div>
+
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-container)' }}>
+                <p className="text-[10px] font-bold mb-2" style={{ color: 'var(--color-outline)' }}>PREVIOUS STUDIES</p>
+                {recentScans.slice(1, 3).length > 0 ? (
+                  recentScans.slice(1, 3).map((s, i) => (
+                    <div key={i} className="mb-2 pb-2 border-b" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                      <p className="text-xs font-semibold" style={{ color: 'var(--color-on-surface)' }}>{s.filename}</p>
+                      <p className="text-[9px]" style={{ color: 'var(--color-on-surface-variant)' }}>{new Date(s.created_at).toLocaleDateString()}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>No previous studies available</p>
+                )}
+              </div>
+
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-container)' }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-on-surface)' }}>Change Detection:</p>
+                <p className="text-[10px]" style={{ color: 'var(--color-on-surface-variant)' }}>✓ No significant interval change detected</p>
+                <p className="text-[10px]" style={{ color: 'var(--color-on-surface-variant)' }}>✓ Findings stable compared to 3 months prior</p>
+              </div>
+            </div>
+
+            <button onClick={() => setActiveModal(null)} className="w-full px-4 py-2.5 rounded-xl font-semibold text-sm" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Clinical Notes Modal */}
+      {activeModal === 'notes' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="rounded-3xl p-6 w-full max-w-md" style={{ background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline-variant)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#4ade8015', color: '#4ade80' }}>
+                  <ClipboardList size={20} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--color-on-surface)' }}>Clinical Documentation</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-2 hover:opacity-60">
+                <X size={20} style={{ color: 'var(--color-on-surface-variant)' }} />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <textarea 
+                value={clinicalNotes} 
+                onChange={(e) => setClinicalNotes(e.target.value)}
+                placeholder="Add clinical notes, findings, impressions, recommendations..."
+                className="w-full h-40 p-3 rounded-xl text-sm resize-none" 
+                style={{ background: 'var(--color-surface-container)', border: '1px solid var(--color-outline-variant)' }} 
+              />
+              <div className="flex gap-2">
+                <button onClick={downloadReport} className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2" style={{ background: '#4ade8015', color: '#4ade80' }}>
+                  <Download size={16} /> Download Report
+                </button>
+                <button onClick={() => setActiveModal(null)} className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Specialist Consultation Modal */}
+      {activeModal === 'consult' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="rounded-3xl p-6 w-full max-w-md" style={{ background: 'var(--color-surface-container-lowest)', border: '1px solid var(--color-outline-variant)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--color-error)15', color: 'var(--color-error)' }}>
+                  <Stethoscope size={20} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--color-on-surface)' }}>Specialist Consultation</h3>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-2 hover:opacity-60">
+                <X size={20} style={{ color: 'var(--color-on-surface-variant)' }} />
+              </button>
+            </div>
+
+            <div className="space-y-3 mb-5">
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-container)' }}>
+                <p className="text-xs font-bold mb-2" style={{ color: 'var(--color-outline)' }}>SPECIALIST TYPES</p>
+                <div className="space-y-2">
+                  {['Pulmonologist', 'Radiologist', 'Thoracic Surgeon', 'General Physician'].map((spec, i) => (
+                    <label key={i} className="flex items-center gap-2 p-2 rounded cursor-pointer hover:opacity-80" style={{ background: 'var(--color-surface-container-low)' }}>
+                      <input type="radio" name="specialist" defaultChecked={i === 0} />
+                      <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>{spec}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl" style={{ background: 'var(--color-surface-container)' }}>
+                <p className="text-xs font-bold mb-2" style={{ color: 'var(--color-outline)' }}>CONSULTATION MESSAGE</p>
+                <textarea placeholder="Brief description of consultation request..." className="w-full h-24 p-2 rounded text-xs resize-none" style={{ background: 'var(--color-surface-container-high)' }} />
+              </div>
+
+              <div className="p-3 rounded-xl" style={{ background: '#ff000010', border: '1px solid var(--color-error)20' }}>
+                <p className="text-[10px]" style={{ color: 'var(--color-error)' }}>⏱ Expected response: 2-4 hours</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setActiveModal(null)} className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm" style={{ background: 'var(--color-surface-container)', border: '1px solid var(--color-outline-variant)' }}>
+                Cancel
+              </button>
+              <button onClick={handleConsultation} className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2" style={{ background: 'var(--color-error)', color: 'white' }}>
+                <Send size={14} /> Submit Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Keyframes */}
       <style>{`

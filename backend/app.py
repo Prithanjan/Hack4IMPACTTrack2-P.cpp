@@ -175,7 +175,10 @@ def _pack_chunk(t, d):
 
 def _jet(v):
     v = max(0., min(1., v))
-    return int(min(1., 1.5 - abs(v * 4 - 3))*255), int(min(1., 1.5 - abs(v * 4 - 2))*255), int(min(1., 1.5 - abs(v * 4 - 1))*255)
+    r = int(max(0., min(1., 1.5 - abs(v * 4 - 3)))*255)
+    g = int(max(0., min(1., 1.5 - abs(v * 4 - 2)))*255)
+    b = int(max(0., min(1., 1.5 - abs(v * 4 - 1)))*255)
+    return r, g, b
 
 def _fallback_heatmap_b64(W, H, top_class):
     blobs = []
@@ -193,7 +196,10 @@ def _fallback_heatmap_b64(W, H, top_class):
             if v > .04:
                 hr,hg,hb = _jet(min(v,1))
                 a = min(v*1.6, .85)
-                row += [int(bg*(1-a)+hr*a), int(bg*(1-a)+hg*a), int(bg*(1-a)+hb*a)]
+                r = max(0, min(255, int(bg*(1-a)+hr*a)))
+                g = max(0, min(255, int(bg*(1-a)+hg*a)))
+                b = max(0, min(255, int(bg*(1-a)+hb*a)))
+                row += [r, g, b]
             else: row += [bg, bg, bg]
         rows.append(bytes([0]) + bytes(row))
     png = b'\x89PNG\r\n\x1a\n' + _pack_chunk(b'IHDR', struct.pack('>IIBBBBB', W, H, 8, 2, 0, 0, 0)) + _pack_chunk(b'IDAT', zlib.compress(b''.join(rows), 9)) + _pack_chunk(b'IEND', b'')

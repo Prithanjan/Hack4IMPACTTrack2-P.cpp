@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Activity, LayoutDashboard, FolderOpen, Sun, Moon, HelpCircle, User, Bell, LogOut, ChevronDown } from 'lucide-react';
+import { Activity, LayoutDashboard, FolderOpen, Sun, Moon, HelpCircle, User, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import NotificationCenter from './NotificationCenter';
 
 export default function Layout() {
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
-  const [hasNewResult, setHasNewResult] = useState(false);
-  const [showToast, setShowToast] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef(null);
@@ -25,12 +24,6 @@ export default function Layout() {
       setIsDarkMode(true);
       document.documentElement.classList.add('dark');
     }
-    const handleAiResult = () => {
-      setHasNewResult(true);
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 5000);
-    };
-    window.addEventListener('aiResult', handleAiResult);
 
     // Close profile menu when clicking outside
     const handleClickOutside = (e) => {
@@ -41,7 +34,6 @@ export default function Layout() {
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
-      window.removeEventListener('aiResult', handleAiResult);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
@@ -147,18 +139,7 @@ export default function Layout() {
               <input className="bg-[var(--color-surface-container-high)] border-none rounded-full px-4 py-1.5 text-sm w-64 focus:ring-2 focus:ring-[var(--color-primary)]/20 transition-all text-[var(--color-on-surface)] placeholder-[var(--color-on-surface-variant)]" placeholder="Search records..." type="text"/>
               <span className="material-symbols-outlined absolute right-3 top-1.5 text-[var(--color-on-surface-variant)] text-lg">search</span>
             </div>
-            <button 
-              className={`p-2 text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)] rounded-md transition-all relative ${hasNewResult ? 'text-[var(--color-tertiary)]' : ''}`}
-              onClick={() => setHasNewResult(false)}
-            >
-              <Bell size={20} />
-              {hasNewResult && (
-                <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-tertiary)] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--color-tertiary)] border-2 border-[var(--color-surface)]"></span>
-                </span>
-              )}
-            </button>
+            <NotificationCenter />
             <button 
               className="p-2 text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)] rounded-md transition-all sm:flex"
               onClick={toggleDarkMode}
@@ -234,21 +215,7 @@ export default function Layout() {
           </div>
         </footer>
 
-        {/* Toast Notification */}
-        <div className={`fixed bottom-20 md:bottom-6 right-6 z-50 transition-all duration-500 transform ${showToast ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-10 opacity-0 scale-95 pointer-events-none'}`}>
-          <div 
-            onClick={() => { setShowToast(false); navigate('/analysis'); }}
-            className="bg-[var(--color-surface-container-high)] border border-[var(--color-outline-variant)]/30 shadow-[0_10px_40px_rgba(0,0,0,0.5)] rounded-xl p-4 flex items-start gap-4 cursor-pointer hover:border-[var(--color-primary)]/50 transition-all w-80"
-          >
-            <div className="w-10 h-10 rounded-full bg-[var(--color-tertiary)]/20 flex items-center justify-center text-[var(--color-tertiary)] shrink-0">
-              <Bell className="animate-pulse" size={20} />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-[var(--color-on-surface)]">Analysis Complete</h4>
-              <p className="text-xs text-[var(--color-on-surface-variant)] mt-1">AI has finished analyzing the radiograph. Click to view results.</p>
-            </div>
-          </div>
-        </div>
+
 
         {/* Mobile Bottom Navigation (Responsive Tabs) */}
         <nav className="md:hidden fixed bottom-0 left-0 w-full bg-[var(--color-surface)] border-t border-[var(--color-outline-variant)]/30 flex justify-around items-center h-16 z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.2)]">
